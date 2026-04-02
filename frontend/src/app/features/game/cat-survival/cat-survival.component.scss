@@ -1,0 +1,124 @@
+.cat-arena {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+
+    h3 {
+        font-size: 1.4rem;
+        color: var(--accent2);
+    }
+
+    .arena-box {
+        position: relative;
+        width: 560px;
+        height: 340px;
+        background: linear-gradient(180deg, #0a1628 0%, #1a2540 100%);
+        border-radius: var(--radius);
+        border: 1px solid var(--surface2);
+        overflow: hidden;
+    }
+
+    .branch {
+        position: absolute;
+        width: 60px;
+        height: 14px;
+        background: #6b4226;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all .2s;
+
+        &.active {
+            background: var(--accent);
+            box-shadow: 0 0 12px var(--accent);
+        }
+
+        &.broken {
+            background: #333;
+            opacity: .4;
+        }
+
+        .branch-letter {
+            color: #fff;
+            font-weight: 700;
+            font-size: 1rem;
+        }
+    }
+
+    .cat {
+        position: absolute;
+        font-size: 1.8rem;
+        transition: left .25s ease, top .25s ease;
+        z-index: 10;
+
+        &.falling {
+            animation: fall 1s forwards;
+        }
+    }
+
+    @keyframes fall {
+        0% {
+            transform: translateY(0) rotate(0deg);
+            opacity: 1;
+        }
+
+        100% {
+            transform: translateY(250px) rotate(180deg);
+            opacity: 0;
+        }
+    }
+
+    .water {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 40px;
+        background: rgba(30, 100, 200, .3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        letter-spacing: 4px;
+    }
+
+    .timer-bar {
+        height: 8px;
+        background: var(--surface2);
+        border-radius: 4px;
+        overflow: hidden;
+
+        .timer-fill {
+            height: 100%;
+            background: var(--success);
+            transition: width .05s linear;
+
+            &.danger {
+                background: var(--danger);
+            }
+        }
+    }
+
+    .game-over {
+        text-align: center;
+        padding: 1.5rem;
+        background: var(--surface);
+        border-radius: var(--radius);
+
+        h2 {
+            font-size: 1.5rem;
+            margin-bottom: .5rem;
+        }
+
+        p {
+            color: var(--muted);
+            margin-bottom: 1rem;
+        }
+    }
+
+    .win-msg {
+        text-align: center;
+        font-size: 1.3rem;
+        color: var(--success);
+    }
+}

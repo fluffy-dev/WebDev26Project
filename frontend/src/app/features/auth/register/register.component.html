@@ -1,0 +1,49 @@
+<div class="register-container">
+  <h2>Create Account</h2>
+
+  @if (error()) {
+    <div class="alert error">{{ error() }}</div>
+  }
+
+  <form (ngSubmit)="onSubmit()">
+    <div class="field">
+      <label>Username</label>
+      <input [(ngModel)]="username" name="username" type="text" required />
+    </div>
+
+    <div class="field">
+      <label>Password</label>
+      <input [(ngModel)]="password" name="password" type="password" required />
+    </div>
+
+    <div class="field">
+      <label>Confirm Password</label>
+      <input
+        [(ngModel)]="passwordConfirm"
+        name="passwordConfirm"
+        type="password"
+        required
+      />
+    </div>
+
+    <div class="avatar-grid">
+      <p class="label">Choose your avatar</p>
+      @for (avatar of avatars(); track avatar.id) {
+        <div
+          class="avatar-item"
+          [class.selected]="selectedAvatarId === avatar.id"
+          (click)="selectAvatar(avatar.id)"
+        >
+          <img [src]="avatar.image_url" [alt]="avatar.name" />
+          <span>{{ avatar.name }}</span>
+        </div>
+      }
+    </div>
+
+    <button type="submit" class="btn-primary" [disabled]="loading()">
+      @if (loading()) { Creating… } @else { Register }
+    </button>
+  </form>
+
+  <p>Already have an account? <a routerLink="/login">Login</a></p>
+</div>
