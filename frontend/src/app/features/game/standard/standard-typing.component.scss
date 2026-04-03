@@ -1,0 +1,246 @@
+/* ===== Standard Typing — Aura Design ===== */
+
+.typing-arena {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    outline: none;
+    min-height: 70vh;
+    padding-top: 10px;
+}
+
+/* -- Stats Bar -- */
+
+.stats-bar {
+    display: flex;
+    align-items: center;
+    gap: 40px;
+    padding: 10px 25px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+}
+
+.mini-stat {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+
+    .label {
+        font-size: 0.75rem;
+        text-transform: lowercase;
+        color: var(--text-muted);
+        font-weight: 500;
+    }
+
+    .val {
+        font-size: 1.4rem;
+        font-family: var(--font-mono);
+        color: var(--accent-gold);
+        font-weight: 600;
+    }
+
+    .pct {
+        font-size: 0.9rem;
+        color: var(--text-muted);
+    }
+}
+
+/* -- Settings -- */
+
+.settings-group {
+    display: flex;
+    gap: 25px;
+    align-items: center;
+}
+
+.wc-settings,
+.hand-settings {
+    display: flex;
+    gap: 12px;
+}
+
+.setting-btn {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color var(--transition-fast);
+    font-weight: 500;
+    background: none;
+    border: none;
+    font-family: var(--font-ui);
+    padding: 4px 8px;
+
+    &:hover {
+        color: var(--text-active);
+    }
+
+    &.active-btn {
+        color: var(--accent-gold);
+    }
+}
+
+/* -- Typing Stage -- */
+
+.main-stage {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    max-width: 1000px;
+    padding: 30px 0;
+}
+
+.text-container {
+    font-family: var(--font-mono);
+    font-size: 1.8rem;
+    font-weight: 400;
+    line-height: 1.6;
+    color: var(--text-muted);
+    position: relative;
+    letter-spacing: 0.08em;
+    max-width: 900px;
+    width: 100%;
+}
+
+.char {
+    transition: color 0.1s ease;
+    border-radius: 2px;
+
+    &.correct {
+        color: var(--text-active);
+    }
+
+    &.incorrect {
+        color: var(--error-red);
+        background-color: var(--error-bg);
+    }
+}
+
+.caret {
+    position: absolute;
+    width: 2px;
+    height: 2.2rem;
+    background-color: var(--accent-gold);
+    border-radius: 1px;
+    transition: transform 0.12s cubic-bezier(0.1, 0, 0, 1);
+    z-index: 2;
+    pointer-events: none;
+
+    &.idle {
+        animation: blink 1s step-end infinite;
+    }
+}
+
+@keyframes blink {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0;
+    }
+}
+
+@keyframes shakeTiny {
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    25% {
+        transform: translateX(-1px);
+    }
+
+    75% {
+        transform: translateX(1px);
+    }
+}
+
+.shake-animation {
+    animation: shakeTiny 0.2s ease-in-out;
+}
+
+/* -- Virtual Keyboard -- */
+
+.keyboard-container {
+    padding: 20px 0 30px;
+    display: flex;
+    justify-content: center;
+}
+
+.keyboard {
+    display: flex;
+    flex-wrap: wrap;
+    width: 850px;
+    gap: 6px;
+    justify-content: center;
+    opacity: 0.4;
+    transition: opacity var(--transition-smooth);
+
+    &:hover {
+        opacity: 0.85;
+    }
+}
+
+.key {
+    background-color: var(--bg-surface);
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 50px;
+    height: 42px;
+    transition: all 0.1s ease;
+    user-select: none;
+
+    &.active {
+        background-color: var(--bg-elevated);
+        color: var(--text-active);
+        transform: translateY(2px);
+        border-color: var(--accent-gold);
+    }
+
+    &.error {
+        color: var(--error-red);
+        border-color: var(--error-red);
+    }
+
+    &.wide {
+        width: 75px;
+    }
+
+    &.extra-wide {
+        width: 90px;
+    }
+
+    &.super-wide {
+        width: 110px;
+    }
+
+    &.space-bar {
+        width: 380px;
+    }
+}
+
+/* Hand Isolation */
+
+.isolate-left .right-hand {
+    opacity: 0.1;
+}
+
+.isolate-right .left-hand {
+    opacity: 0.1;
+}
+
+.isolate-both .right-hand,
+.isolate-both .left-hand {
+    opacity: 1;
+}
