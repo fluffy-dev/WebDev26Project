@@ -63,7 +63,8 @@ class RegisterSerializer(serializers.Serializer):
             username=validated_data["username"],
             password=validated_data["password"],
         )
-        Profile.objects.create(user=user, avatar=avatar)
+        user.profile.avatar = avatar
+        user.profile.save()
         return user
 
 
