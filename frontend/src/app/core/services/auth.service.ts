@@ -1,7 +1,7 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { tap, catchError, throwError } from 'rxjs';
+import { tap, catchError, throwError, switchMap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthTokens, Profile } from '../models';
 
@@ -20,10 +20,19 @@ export class AuthService {
 
     readonly profile = signal<Profile | null>(null);
     readonly isLoggedIn = computed(() => this.profile() !== null);
+    readonly isReady = signal(false);
 
     constructor(private http: HttpClient, private router: Router) {
         if (this.getAccessToken()) {
-            this.loadProfile().subscribe({ error: () => this.logout() });
+            this.loadProfile().subscribe({
+                next: () => this.isReady.set(true),
+                error: () => {
+                    this.logout();
+                    this.isReady.set(true);
+                }
+            });
+        } else {
+            this.isReady.set(true);
         }
     }
 
@@ -40,10 +49,8 @@ export class AuthService {
         return this.http
             .post<AuthTokens>(`${this.base}/token/`, { username, password })
             .pipe(
-                tap((tokens) => {
-                    this.setTokens(tokens);
-                    this.loadProfile().subscribe();
-                })
+                tap((tokens) => this.setTokens(tokens)),
+                switchMap(() => this.loadProfile())
             );
     }
 
