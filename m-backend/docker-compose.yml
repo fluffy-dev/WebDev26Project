@@ -20,7 +20,7 @@ services:
     image: traefik:v3.0
     container_name: traefik
     ports:
-      - "80:80"
+      - "443:80"
       - "8080:8080"   # dashboard, disable in prod
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
