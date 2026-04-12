@@ -11,6 +11,7 @@ Faker==25.0.1
 iniconfig==2.3.0
 jmespath==1.1.0
 packaging==26.0
+pillow==12.2.0
 pluggy==1.6.0
 psycopg==3.1.20
 psycopg-binary==3.1.20
