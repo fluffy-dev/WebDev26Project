@@ -2,7 +2,11 @@ from leaderboard.domain.repositories import AbstractLeaderboardRepository
 
 
 class ResetLeaderboardUseCase:
-    """Archive today's leaderboard and prepare a clean slate for tomorrow."""
+    """Archive today's leaderboard and prepare a clean slate for tomorrow.
+
+    Args:
+        repository: Leaderboard persistence port.
+    """
 
     def __init__(self, repository: AbstractLeaderboardRepository) -> None:
         self._repository = repository

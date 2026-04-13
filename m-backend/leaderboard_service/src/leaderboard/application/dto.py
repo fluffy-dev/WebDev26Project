@@ -6,7 +6,13 @@ from uuid import UUID
 
 @dataclass(frozen=True)
 class LeaderboardEntryDTO:
-    """Wire representation of a single leaderboard entry."""
+    """Wire representation of a single leaderboard entry.
+
+    Args:
+        place: 1-based rank.
+        user_id: User's UUID.
+        score: Credits earned today.
+    """
 
     place: int
     user_id: UUID
@@ -15,7 +21,12 @@ class LeaderboardEntryDTO:
 
 @dataclass(frozen=True)
 class LeaderboardResponseDTO:
-    """Full response payload for GET /leaderboard."""
+    """Full response payload for GET /leaderboard.
+
+    Args:
+        top: Ordered top-N entries.
+        user_place: Requesting user's rank, or None.
+    """
 
     top: list[LeaderboardEntryDTO]
     user_place: int | None

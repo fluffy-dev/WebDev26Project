@@ -11,7 +11,16 @@ _STATUS_MAP = {
 
 
 def custom_exception_handler(exc, context) -> Response | None:
-    """Map application exceptions to HTTP responses."""
+    """Map application exceptions to HTTP responses.
+
+    Args:
+        exc: The raised exception.
+        context: DRF context dict containing the view and request.
+
+    Returns:
+        A DRF Response with the appropriate status code, or None to fall
+        through to DRF's default handler for non-application exceptions.
+    """
     status_code = _STATUS_MAP.get(type(exc))
     if status_code is not None:
         return Response({"detail": str(exc)}, status=status_code)

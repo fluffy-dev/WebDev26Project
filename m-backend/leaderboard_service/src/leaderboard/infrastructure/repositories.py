@@ -15,13 +15,28 @@ _PROCESSED_TTL = 60 * 60 * 24  # 1 day
 
 
 class RedisLeaderboardRepository(AbstractLeaderboardRepository):
-    """Redis-backed implementation of the leaderboard repository."""
+    """Redis-backed implementation of the leaderboard repository.
+
+    All scores are stored in a ZSET keyed by leaderboard:daily.
+    Idempotency is tracked in a SET keyed by processed_events:daily.
+
+    Args:
+        client: A configured redis.Redis instance.
+    """
 
     def __init__(self, client: redis.Redis) -> None:
         self._client = client
 
     def get_leaderboard(self, user_id: UUID, top_n: int) -> LeaderboardResult:
-        """Return top-N entries and the caller's rank in a single round-trip pair."""
+        """Return top-N entries and the caller's rank in a single round-trip pair.
+
+        Args:
+            user_id: Requesting user's UUID.
+            top_n: How many top entries to include.
+
+        Returns:
+            LeaderboardResult with entries sorted by score descending.
+        """
         member = str(user_id).encode()
         pipe = self._client.pipeline()
         pipe.zrevrange(_DAILY_KEY, 0, top_n - 1, withscores=True)
@@ -41,22 +56,43 @@ class RedisLeaderboardRepository(AbstractLeaderboardRepository):
         return LeaderboardResult(top=top, user_place=user_place)
 
     def increment_score(self, user_id: UUID, amount: int) -> None:
-        """Atomically increment user's ZSET score."""
+        """Atomically increment user's ZSET score.
+
+        Args:
+            user_id: Target user.
+            amount: Positive integer credits to add.
+        """
         self._client.zincrby(_DAILY_KEY, amount, str(user_id).encode())
 
     def is_event_processed(self, event_id: str) -> bool:
-        """Return True if event_id is present in the processed-events SET."""
+        """Return True if event_id is present in the processed-events SET.
+
+        Args:
+            event_id: Unique submit UUID string.
+
+        Returns:
+            True if already seen today.
+        """
         return bool(self._client.sismember(_PROCESSED_KEY, event_id.encode()))
 
     def mark_event_processed(self, event_id: str) -> None:
-        """Add event_id to the processed-events SET and (re)set its TTL."""
+        """Add event_id to the processed-events SET and (re)set its TTL.
+
+        Args:
+            event_id: Unique submit UUID string.
+        """
         pipe = self._client.pipeline()
         pipe.sadd(_PROCESSED_KEY, event_id.encode())
         pipe.expire(_PROCESSED_KEY, _PROCESSED_TTL)
         pipe.execute()
 
     def reset_daily(self) -> None:
-        """Atomically rename the active leaderboard to a dated archive key."""
+        """Atomically rename the active leaderboard to a dated archive key.
+
+        Raises:
+            redis.ResponseError: If leaderboard:daily does not exist; callers
+                should catch and ignore this to handle days with no activity.
+        """
         archive_key = f"leaderboard:archive:{date.today()}".encode()
         pipe = self._client.pipeline()
         pipe.rename(_DAILY_KEY, archive_key)

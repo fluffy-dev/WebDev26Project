@@ -8,7 +8,6 @@ from rest_framework.test import APIClient
 
 from leaderboard.infrastructure.repositories import RedisLeaderboardRepository
 
-pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture()

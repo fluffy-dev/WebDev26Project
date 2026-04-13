@@ -4,7 +4,6 @@ import pytest
 
 from leaderboard.infrastructure.repositories import RedisLeaderboardRepository
 
-pytestmark = pytest.mark.django_db(transaction=True)
 
 
 def test_increment_and_rank(leaderboard_repo: RedisLeaderboardRepository) -> None:

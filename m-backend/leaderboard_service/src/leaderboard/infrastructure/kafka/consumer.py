@@ -15,7 +15,17 @@ logger = logging.getLogger(__name__)
 
 
 class LeaderboardEventConsumer:
-    """Long-running Kafka consumer that processes submit.rewarded events."""
+    """Long-running Kafka consumer that processes submit.rewarded events.
+
+    Runs with enable.auto.commit=false. Offsets are committed only after
+    the event has been fully processed or identified as a duplicate.
+
+    Args:
+        use_case: RecordRewardUseCase wired with a real Redis repository.
+        bootstrap_servers: Comma-separated Kafka broker addresses.
+        group_id: Consumer group identifier.
+        topic: Kafka topic to subscribe to.
+    """
 
     def __init__(
         self,
@@ -58,7 +68,11 @@ class LeaderboardEventConsumer:
             self._consumer.close()
 
     def _handle(self, message) -> None:
-        """Deserialise a single message and delegate to the use case."""
+        """Deserialise a single message and delegate to the use case.
+
+        Args:
+            message: A confluent_kafka Message object.
+        """
         try:
             payload = json.loads(message.value().decode("utf-8"))
             event = payload.get("event")
@@ -76,7 +90,11 @@ class LeaderboardEventConsumer:
 
 
 def build_consumer() -> LeaderboardEventConsumer:
-    """Wire up the consumer with production dependencies."""
+    """Wire up the consumer with production dependencies.
+
+    Returns:
+        A fully configured LeaderboardEventConsumer.
+    """
     redis_client = get_redis_client()
     repository = RedisLeaderboardRepository(client=redis_client)
     use_case = RecordRewardUseCase(repository=repository)

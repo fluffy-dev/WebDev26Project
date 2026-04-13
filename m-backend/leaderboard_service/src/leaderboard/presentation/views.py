@@ -17,12 +17,24 @@ class LeaderboardView(APIView):
     """GET /leaderboard — return today's top-N and the caller's rank."""
 
     def get(self, request: Request) -> Response:
-        """Handle the leaderboard read request."""
+        """Handle the leaderboard read request.
+
+        Reads X-User-Id injected by Traefik's ForwardAuth middleware.
+
+        Args:
+            request: Incoming DRF request.
+
+        Returns:
+            200 response with top entries and the requesting user's place.
+        """
         user_id_header = request.headers.get("X-User-Id")
         if not user_id_header:
             return Response({"detail": "X-User-Id header missing"}, status=401)
         
-        user_id = UUID(user_id_header)
+        try:
+            user_id = UUID(user_id_header)
+        except ValueError:
+            return Response({"detail": "Invalid X-User-Id format"}, status=400)
 
         use_case = GetLeaderboardUseCase(
             repository=RedisLeaderboardRepository(client=get_redis_client()),
