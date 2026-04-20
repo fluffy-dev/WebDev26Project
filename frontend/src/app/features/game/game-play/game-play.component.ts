@@ -13,13 +13,13 @@ import { CatSurvivalComponent } from '../cat-survival/cat-survival.component';
   template: `
     <div class="game-play">
       @if (level()) {
-        @if (level()!.mode === 'standard') {
-          <app-standard-typing
+        @if (level()!.level_type === 'cat_running') {
+          <app-cat-survival
             [level]="level()!"
             (completed)="onCompleted($event)"
           />
         } @else {
-          <app-cat-survival
+          <app-standard-typing
             [level]="level()!"
             (completed)="onCompleted($event)"
           />
@@ -35,16 +35,8 @@ import { CatSurvivalComponent } from '../cat-survival/cat-survival.component';
                   <span class="result-value">{{ result()!.wpm | number:'1.0-0' }}</span>
                 </div>
                 <div class="result-stat">
-                  <span class="result-label">accuracy</span>
-                  <span class="result-value">{{ result()!.accuracy | number:'1.0-1' }}%</span>
-                </div>
-                <div class="result-stat">
                   <span class="result-label">earned</span>
-                  <span class="result-value accent">+{{ result()!.earned_score }}</span>
-                </div>
-                <div class="result-stat">
-                  <span class="result-label">total score</span>
-                  <span class="result-value">{{ result()!.new_total_score }}</span>
+                  <span class="result-value accent">+{{ result()!.rewarded_credits }}</span>
                 </div>
               </div>
               <button class="action-btn" (click)="clearResult()">Back to Dashboard</button>
@@ -76,7 +68,7 @@ export class GamePlayComponent implements OnInit {
   ) { }
 
   ngOnInit(): void {
-    const id = Number(this.route.snapshot.paramMap.get('id'));
+    const id = this.route.snapshot.paramMap.get('id') ?? '';
     this.game.getLevel(id).subscribe({
       next: (l) => this.level.set(l),
       error: () => this.error.set('Level not found.'),
@@ -86,7 +78,7 @@ export class GamePlayComponent implements OnInit {
   onCompleted(payload: { wpm: number; accuracy: number }): void {
     const level = this.level()!;
     this.game
-      .submitAttempt({ level_id: level.id, ...payload })
+      .submitAttempt({ level_id: level.id, wpm: payload.wpm })
       .subscribe({
         next: (res) => this.result.set(res),
         error: () => alert('Score submission failed.'),
