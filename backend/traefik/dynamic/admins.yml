@@ -1,0 +1,55 @@
+http:
+  routers:
+
+    traefik-dashboard:
+      rule: "PathPrefix(`/admin/traefik`)"
+      service: api@internal
+      middlewares:
+        - admin-traefik-redirect@file
+        - strip-traefik-prefix@file
+
+    traefik-api:
+      rule: "PathPrefix(`/api`)"
+      service: api@internal
+
+    kafka-admin:
+      rule: "PathPrefix(`/admin/kafka`)"
+      service: kafka-ui
+      middlewares: [global-cors@file]
+
+    minio-admin:
+      rule: "PathPrefix(`/admin/minio`)"
+      service: minio-console
+      middlewares:
+        - strip-minio-prefix@file
+        - global-cors@file
+
+    grafana-admin:
+      rule: "PathPrefix(`/admin/grafana`)"
+      service: grafana
+      middlewares: [global-cors@file]
+
+    docker-admin:
+      rule: "PathPrefix(`/admin/docker`)"
+      service: dockadmin
+      middlewares:
+        - admin-docker-redirect@file
+        - strip-docker-prefix@file
+        - global-cors@file
+
+  services:
+    kafka-ui:
+      loadBalancer:
+        servers: [{url: "http://kafka-ui:8080"}]
+    
+    minio-console:
+      loadBalancer:
+        servers: [{url: "http://minio:9001"}]
+    
+    grafana:
+      loadBalancer:
+        servers: [{url: "http://grafana:3000"}]
+    
+    dockadmin:
+      loadBalancer:
+        servers: [{url: "http://dockadmin:3000"}]

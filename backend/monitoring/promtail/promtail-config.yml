@@ -1,0 +1,37 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: "typecat-containers"
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'compose_service'
+      - target_label: 'job'
+        replacement: 'typecat'
+
+    pipeline_stages:
+      # Try to parse JSON log lines (all services use python-json-logger)
+      - json:
+          expressions:
+            level: levelname
+            logger: name
+            message: message
+            service: service
+      # Fall back gracefully for non-JSON lines
+      - labels:
+          level:
+          logger:
+          service:

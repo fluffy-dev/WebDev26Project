@@ -1,0 +1,83 @@
+http:
+  middlewares:
+    
+    strip-auth-prefix:
+      stripPrefix:
+        prefixes: ["/auth"]
+    auth-prefix-header:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Prefix: "/auth"
+
+    strip-level-prefix:
+      stripPrefix:
+        prefixes: ["/level"]
+    level-prefix-header:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Prefix: "/level"
+
+    strip-balance-prefix:
+      stripPrefix:
+        prefixes: ["/balance", "/transactions"]
+    balance-prefix-header:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Prefix: "/balance"
+
+    strip-leaderboard-prefix:
+      stripPrefix:
+        prefixes: ["/leaderboard"]
+    leaderboard-prefix-header:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Prefix: "/leaderboard"
+
+
+    global-cors:
+      headers:
+        accessControlAllowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+        accessControlAllowHeaders: ["Origin", "Content-Type", "Accept", "Authorization"]
+        accessControlExposeHeaders: ["X-User-Id", "X-Username"]
+        accessControlAllowOriginList: ["*"]
+        accessControlMaxAge: 100
+        addVaryHeader: true
+
+    dmz-headers:
+      headers:
+        customRequestHeaders:
+          X-User-Id: ""
+          X-Username: ""
+
+    auth-verify:
+      forwardAuth:
+        address: "http://auth-service:8000/verify"
+        authResponseHeaders: ["X-User-Id", "X-Username"]
+        authRequestHeaders: ["Authorization"]
+
+
+    strip-traefik-prefix:
+      stripPrefix:
+        prefixes: ["/admin/traefik"]
+
+    admin-traefik-redirect:
+      redirectRegex:
+        regex: "^(.*)/admin/traefik$"
+        replacement: "${1}/admin/traefik/"
+        permanent: true
+
+    strip-minio-prefix:
+      stripPrefix:
+        prefixes: ["/admin/minio"]
+
+    strip-docker-prefix:
+      stripPrefix:
+        prefixes: ["/admin/docker"]
+
+    admin-docker-redirect:
+      redirectRegex:
+        regex: "^(.*)/admin/docker$"
+        replacement: "${1}/admin/docker/"
+        permanent: true
+
+

@@ -1,0 +1,236 @@
+#!/usr/bin/env bash
+# =============================================================================
+#  typecat — Project Management CLI
+# =============================================================================
+#  Usage: ./scripts/typecat <command> [options]
+#
+#  Commands:
+#    up          Start the full stack (infra + services + monitoring)
+#    down        Stop everything
+#    restart     Restart one or all services
+#    build       Rebuild service images
+#    health      Check health of all services
+#    logs        Tail logs for a service (or all)
+#    metrics     Print Prometheus metrics for a service
+#    ws-test     Test WebSocket leaderboard connection
+#    migrate     Run Django migrations for a service
+#    shell       Open a Django shell in a service
+#    test        Run tests for a service
+#    status      Show container statuses
+#    topics      List Kafka topics
+#    reset-lb    Reset the daily leaderboard
+#    grafana     Open Grafana in browser
+# =============================================================================
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+COMPOSE="docker compose -f $PROJECT_DIR/docker-compose.yml"
+
+# ─── Colour helpers ──────────────────────────────────────────────────────────
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+RESET='\033[0m'
+
+info()    { echo -e "${BLUE}[typecat]${RESET} $*"; }
+success() { echo -e "${GREEN}[typecat]${RESET} $*"; }
+warn()    { echo -e "${YELLOW}[typecat]${RESET} $*"; }
+error()   { echo -e "${RED}[typecat]${RESET} $*" >&2; }
+
+banner() {
+  echo -e "${CYAN}"
+  echo "  ████████╗██╗   ██╗██████╗ ███████╗ ██████╗ █████╗ ████████╗"
+  echo "  ╚══██╔══╝╚██╗ ██╔╝██╔══██╗██╔════╝██╔════╝██╔══██╗╚══██╔══╝"
+  echo "     ██║    ╚████╔╝ ██████╔╝█████╗  ██║     ███████║   ██║   "
+  echo "     ██║     ╚██╔╝  ██╔═══╝ ██╔══╝  ██║     ██╔══██║   ██║   "
+  echo "     ██║      ██║   ██║     ███████╗╚██████╗██║  ██║   ██║   "
+  echo "     ╚═╝      ╚═╝   ╚═╝     ╚══════╝ ╚═════╝╚═╝  ╚═╝   ╚═╝   "
+  echo -e "  Typing Platform — Management CLI${RESET}"
+  echo ""
+}
+
+# ─── Commands ────────────────────────────────────────────────────────────────
+
+cmd_up() {
+  info "Starting infrastructure..."
+  $COMPOSE up -d zookeeper kafka redis postgres_auth postgres_level postgres_balance debezium
+  info "Waiting for kafka-init to complete..."
+  $COMPOSE up -d kafka-init
+  $COMPOSE wait kafka-init
+  info "Starting application services..."
+  $COMPOSE up -d auth_service level_service balance_service leaderboard_service traefik
+  info "Starting monitoring stack..."
+  $COMPOSE up -d prometheus loki promtail tempo grafana redis-exporter kafka-exporter
+  success "Stack is up! 🚀"
+  info "Grafana → http://localhost:8000/dashboard  (admin / typecat_grafana)"
+  info "Traefik → http://localhost:8080"
+  info "API     → http://localhost:8000"
+}
+
+cmd_down() {
+  info "Stopping all containers..."
+  $COMPOSE down "${@}"
+  success "Done."
+}
+
+cmd_restart() {
+  local svc="${1:-}"
+  if [[ -z "$svc" ]]; then
+    info "Restarting all services..."
+    $COMPOSE restart auth_service level_service balance_service leaderboard_service
+  else
+    info "Restarting $svc..."
+    $COMPOSE restart "$svc"
+  fi
+  success "Restarted."
+}
+
+cmd_build() {
+  local svc="${1:-}"
+  if [[ -z "$svc" ]]; then
+    info "Building all service images..."
+    $COMPOSE build auth_service level_service balance_service leaderboard_service
+  else
+    info "Building $svc..."
+    $COMPOSE build "$svc"
+  fi
+  success "Build complete."
+}
+
+cmd_health() {
+  source "$SCRIPT_DIR/health-check.sh"
+}
+
+cmd_logs() {
+  local svc="${1:-}"
+  local lines="${2:-100}"
+  if [[ -z "$svc" ]]; then
+    $COMPOSE logs -f --tail="$lines" auth_service level_service balance_service leaderboard_service
+  else
+    $COMPOSE logs -f --tail="$lines" "$svc"
+  fi
+}
+
+cmd_metrics() {
+  local svc="${1:?Usage: typecat metrics <service_name>}"
+  info "Fetching Prometheus metrics from $svc..."
+  $COMPOSE exec "$svc" sh -c 'wget -qO- http://localhost:8000/metrics' | head -60
+}
+
+cmd_ws_test() {
+  if command -v wscat &>/dev/null; then
+    info "Connecting to ws://localhost/leaderboard/ws ..."
+    wscat -c "ws://localhost/leaderboard/ws"
+  else
+    warn "wscat not installed. Installing..."
+    npm install -g wscat
+    wscat -c "ws://localhost/leaderboard/ws"
+  fi
+}
+
+cmd_migrate() {
+  local svc="${1:?Usage: typecat migrate <service_name>}"
+  info "Running migrations for $svc..."
+  $COMPOSE exec "$svc" python manage.py migrate
+  success "Migrations done."
+}
+
+cmd_shell() {
+  local svc="${1:?Usage: typecat shell <service_name>}"
+  info "Opening Django shell for $svc..."
+  $COMPOSE exec "$svc" python manage.py shell
+}
+
+cmd_test() {
+  local svc="${1:?Usage: typecat test <service_name>}"
+  local svc_dir="$PROJECT_DIR/${svc}"
+  info "Running tests for $svc..."
+  docker run --rm \
+    -v "$svc_dir:/workspace" \
+    -w /workspace \
+    python:3.12-slim \
+    sh -c "pip install -r requirements.txt -q && cd src && python -m pytest -v"
+}
+
+cmd_status() {
+  $COMPOSE ps
+}
+
+cmd_topics() {
+  info "Listing Kafka topics..."
+  $COMPOSE exec kafka kafka-topics --bootstrap-server localhost:9092 --list
+}
+
+cmd_reset_lb() {
+  info "Resetting daily leaderboard..."
+  $COMPOSE exec leaderboard_service python manage.py reset_leaderboard
+  success "Leaderboard reset."
+}
+
+cmd_grafana() {
+  info "Opening Grafana at http://localhost:8000/dashboard ..."
+  open "http://localhost:8000/dashboard" 2>/dev/null || xdg-open "http://localhost:8000/dashboard" 2>/dev/null || \
+    warn "Could not open browser. Visit: http://localhost:8000/dashboard"
+}
+
+# ─── Dispatch ────────────────────────────────────────────────────────────────
+
+CMD="${1:-help}"
+shift || true
+
+case "$CMD" in
+  up)         cmd_up "$@" ;;
+  down)       cmd_down "$@" ;;
+  restart)    cmd_restart "$@" ;;
+  build)      cmd_build "$@" ;;
+  health)     cmd_health "$@" ;;
+  logs)       cmd_logs "$@" ;;
+  metrics)    cmd_metrics "$@" ;;
+  ws-test)    cmd_ws_test "$@" ;;
+  migrate)    cmd_migrate "$@" ;;
+  shell)      cmd_shell "$@" ;;
+  test)       cmd_test "$@" ;;
+  status)     cmd_status "$@" ;;
+  topics)     cmd_topics "$@" ;;
+  reset-lb)   cmd_reset_lb "$@" ;;
+  grafana)    cmd_grafana "$@" ;;
+  help|--help|-h)
+    banner
+    echo -e "${BOLD}Usage:${RESET} typecat <command> [options]"
+    echo ""
+    echo -e "${BOLD}Commands:${RESET}"
+    echo "  up                      Start the full stack"
+    echo "  down [--volumes]        Stop everything (--volumes removes data)"
+    echo "  restart [service]       Restart a service or all app services"
+    echo "  build [service]         Rebuild service Docker images"
+    echo "  health                  Health-check all services and dependencies"
+    echo "  logs [service] [lines]  Tail logs (default: all services, 100 lines)"
+    echo "  metrics <service>       Print raw Prometheus metrics for a service"
+    echo "  ws-test                 Connect to live leaderboard WebSocket"
+    echo "  migrate <service>       Run Django migrations"
+    echo "  shell <service>         Open a Django shell"
+    echo "  test <service>          Run pytest for a service"
+    echo "  status                  Show container statuses"
+    echo "  topics                  List Kafka topics"
+    echo "  reset-lb                Reset the daily leaderboard"
+    echo "  grafana                 Open Grafana in browser"
+    echo ""
+    echo -e "${BOLD}Examples:${RESET}"
+    echo "  typecat up"
+    echo "  typecat logs leaderboard_service"
+    echo "  typecat health"
+    echo "  typecat metrics auth_service"
+    echo "  typecat ws-test"
+    echo "  typecat shell auth_service"
+    ;;
+  *)
+    error "Unknown command: $CMD"
+    echo "Run 'typecat help' for usage."
+    exit 1
+    ;;
+esac
