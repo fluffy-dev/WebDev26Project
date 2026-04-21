@@ -1,0 +1,581 @@
+{
+  "info": {
+    "name": "TypeCat Backend",
+    "_postman_id": "typecat-backend-collection",
+    "description": "Complete API collection for the TypeCat microservice backend.\n\nAll requests go through the Traefik reverse-proxy at `{{base_url}}` (default: http://localhost:8000).\n\n**Auth flow:**\n1. Call `POST /auth/login` or `POST /auth/registration`\n2. The response contains `access_token` and `refresh_token`\n3. The collection auto-saves tokens into collection variables via the login/register post-response scripts\n4. Protected endpoints use `{{access_token}}` in the Bearer Authorization header\n\n**Services & prefixes (Traefik routing):**\n- `/auth/*` → auth_service\n- `/level/*` → level_service  (requires auth)\n- `/balance/*` or `/transactions/*` → balance_service  (requires auth)\n- `/leaderboard/*` → leaderboard_service  (requires auth)\n- `/ws` → leaderboard_service WebSocket",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refresh_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "level_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "🔐 Auth Service",
+      "description": "Authentication and user management endpoints. Routes through Traefik at /auth prefix (stripped before reaching the service).\n\nPublic endpoints (no auth required): login, registration, refresh, avatars.\nProtected endpoints: /auth/me, /auth/users/:id, /auth/verify.",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('access_token', body.access_token);",
+                  "    pm.collectionVariables.set('refresh_token', body.refresh_token);",
+                  "    pm.collectionVariables.set('user_id', body.user_id);",
+                  "    console.log('Tokens saved. user_id:', body.user_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"login\": \"your_username_or_email\",\n  \"password\": \"your_password\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Authenticates a user by username/email and password.\n\n**Returns:** `user_id`, `access_token`, `refresh_token`\n\nThe post-response script automatically saves tokens into collection variables."
+          },
+          "response": [
+            {
+              "name": "200 OK – Token pair",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"user_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"access_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n  \"refresh_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('user_id', body.id);",
+                  "    console.log('Registered user_id:', body.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"newuser\",\n  \"email\": \"newuser@example.com\",\n  \"password\": \"securepass123\",\n  \"profile_image\": null\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/registration",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "registration"]
+            },
+            "description": "Creates a new user account.\n\n**Body fields:**\n- `username` (string, max 150)\n- `email` (string)\n- `password` (string, min 8 chars)\n- `profile_image` (UUID, optional) — pick a UUID from `GET /auth/avatars`\n\n**Returns:** User profile (id, username, email, created_at, updated_at, profile_image_url)"
+          },
+          "response": [
+            {
+              "name": "201 Created – User profile",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"username\": \"newuser\",\n  \"email\": \"newuser@example.com\",\n  \"created_at\": \"2026-04-21T10:00:00Z\",\n  \"updated_at\": \"2026-04-21T10:00:00Z\",\n  \"profile_image_url\": null\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('access_token', body.access_token);",
+                  "    console.log('Access token refreshed.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/refresh",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "refresh"]
+            },
+            "description": "Issues a new access token using a valid refresh token.\n\n**Returns:** `{ access_token: string }`\n\nThe post-response script auto-saves the new `access_token` to collection variables."
+          },
+          "response": [
+            {
+              "name": "200 OK – New access token",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"access_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Get My Profile (me)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "me"]
+            },
+            "description": "Returns the currently authenticated user's profile.\n\n**Requires:** Bearer token in Authorization header."
+          },
+          "response": [
+            {
+              "name": "200 OK – User profile",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"username\": \"myuser\",\n  \"email\": \"myuser@example.com\",\n  \"created_at\": \"2026-04-21T10:00:00Z\",\n  \"updated_at\": \"2026-04-21T10:00:00Z\",\n  \"profile_image_url\": \"http://localhost:9000/typecat-static/avatars/cat1.png\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Get User by ID",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/auth/users/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "users", "{{user_id}}"]
+            },
+            "description": "Retrieves a user's public profile by their UUID.\n\n**Requires:** Bearer token.\n\nReplace `{{user_id}}` with the target user's UUID."
+          },
+          "response": [
+            {
+              "name": "200 OK – User profile",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"username\": \"someuser\",\n  \"email\": \"someuser@example.com\",\n  \"created_at\": \"2026-04-21T10:00:00Z\",\n  \"updated_at\": \"2026-04-21T10:00:00Z\",\n  \"profile_image_url\": null\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Verify Token (ForwardAuth)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/auth/verify",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "verify"]
+            },
+            "description": "Used internally by Traefik's ForwardAuth middleware to validate JWT tokens.\n\nOn success returns HTTP 200 with `X-User-Id` and `X-Username` response headers, which Traefik then injects into requests to downstream services.\n\n**Requires:** Bearer token."
+          },
+          "response": [
+            {
+              "name": "200 OK – Token valid",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                { "key": "X-User-Id", "value": "550e8400-e29b-41d4-a716-446655440000" },
+                { "key": "X-Username", "value": "myuser" }
+              ],
+              "body": "",
+              "_postman_previewlanguage": "text"
+            }
+          ]
+        },
+        {
+          "name": "List Avatars",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/auth/avatars",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "avatars"]
+            },
+            "description": "Returns the full catalogue of predefined profile avatar images.\n\nPublic endpoint — no auth required.\n\nUse the returned `id` fields as the `profile_image` value when registering."
+          },
+          "response": [
+            {
+              "name": "200 OK – Avatar list",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "[\n  {\n    \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n    \"image_url\": \"http://localhost:9000/typecat-static/avatars/cat1.png\"\n  },\n  {\n    \"id\": \"b2c3d4e5-f6a7-8901-bcde-f12345678901\",\n    \"image_url\": \"http://localhost:9000/typecat-static/avatars/cat2.png\"\n  }\n]",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/auth/health",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "health"]
+            },
+            "description": "Auth service liveness/readiness probe. No auth required."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📝 Level Service",
+      "description": "Typing level management and submission endpoints. Routes through Traefik at /level prefix.\n\nAll endpoints require authentication (Traefik ForwardAuth injects X-User-Id and X-Username headers).",
+      "item": [
+        {
+          "name": "List Levels",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/level?start=0&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["level"],
+              "query": [
+                { "key": "start", "value": "0", "description": "Pagination offset (default: 0)" },
+                { "key": "limit", "value": "20", "description": "Number of results to return (default: 20)" }
+              ]
+            },
+            "description": "Returns a paginated list of all typing levels.\n\n**Query params:**\n- `start` (int, default 0) — pagination offset\n- `limit` (int, default 20) — results per page\n\n**Requires:** Bearer token."
+          },
+          "response": [
+            {
+              "name": "200 OK – Paginated level list",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"count\": 42,\n  \"results\": [\n    {\n      \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n      \"text\": \"The quick brown fox jumps over the lazy dog.\",\n      \"cost\": 10,\n      \"goal_wpm\": 60,\n      \"level_type\": \"standard\",\n      \"created_at\": \"2026-04-21T10:00:00Z\",\n      \"updated_at\": \"2026-04-21T10:00:00Z\"\n    }\n  ]\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Get Level by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('level_id', body.id);",
+                  "    console.log('level_id saved:', body.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/level/{{level_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["level", "{{level_id}}"]
+            },
+            "description": "Returns details of a single level identified by its UUID.\n\nReplace `{{level_id}}` with the target level's UUID.\n\n**Requires:** Bearer token."
+          },
+          "response": [
+            {
+              "name": "200 OK – Level detail",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"text\": \"The quick brown fox jumps over the lazy dog.\",\n  \"cost\": 10,\n  \"goal_wpm\": 60,\n  \"level_type\": \"standard\",\n  \"created_at\": \"2026-04-21T10:00:00Z\",\n  \"updated_at\": \"2026-04-21T10:00:00Z\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Submit Level Attempt",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"level_id\": \"{{level_id}}\",\n  \"wpm\": 75\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/level/submit",
+              "host": ["{{base_url}}"],
+              "path": ["level", "submit"]
+            },
+            "description": "Submits a typing attempt for a level.\n\nUser identity (`user_id`, `username`) is read from Traefik-injected headers (`X-User-Id`, `X-Username`). Any user_id in the body is ignored.\n\n**Body fields:**\n- `level_id` (UUID) — the level being attempted\n- `wpm` (int, min 1) — words per minute achieved\n\n**Returns:** submission record with `rewarded_credits`.\n\n**Requires:** Bearer token."
+          },
+          "response": [
+            {
+              "name": "201 Created – Submit result",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": \"660e8400-e29b-41d4-a716-446655440001\",\n  \"level_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"user_id\": \"770e8400-e29b-41d4-a716-446655440002\",\n  \"wpm\": 75,\n  \"rewarded_credits\": 25,\n  \"created_at\": \"2026-04-21T10:05:00Z\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Get My Level Stats",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/level/stats",
+              "host": ["{{base_url}}"],
+              "path": ["level", "stats"]
+            },
+            "description": "Returns the authenticated user's best WPM across all level attempts.\n\nUser identity is read from Traefik-injected `X-User-Id` header.\n\n**Requires:** Bearer token."
+          },
+          "response": [
+            {
+              "name": "200 OK – User stats",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"user_id\": \"770e8400-e29b-41d4-a716-446655440002\",\n  \"best_wpm\": 92\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/level/health",
+              "host": ["{{base_url}}"],
+              "path": ["level", "health"]
+            },
+            "description": "Level service liveness/readiness probe. Routes through the admin router (no auth required)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "💰 Balance Service",
+      "description": "User balance and transaction history endpoints. Routes through Traefik on /balance and /transactions prefixes.\n\nAll endpoints require authentication.",
+      "item": [
+        {
+          "name": "Get Balance",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/balance/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["balance", "{{user_id}}"]
+            },
+            "description": "Returns the current credit balance for a given user.\n\n**Path param:** `user_id` (UUID)\n\n**Returns:** `id`, `user_id`, `balance` (int, credits), `updated_at`\n\n**Requires:** Bearer token."
+          },
+          "response": [
+            {
+              "name": "200 OK – Balance",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": \"880e8400-e29b-41d4-a716-446655440003\",\n  \"user_id\": \"770e8400-e29b-41d4-a716-446655440002\",\n  \"balance\": 150,\n  \"updated_at\": \"2026-04-21T10:05:00Z\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "List Transactions",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/transactions/{{user_id}}?start=0&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["transactions", "{{user_id}}"],
+              "query": [
+                { "key": "start", "value": "0", "description": "Pagination offset (default: 0, min: 0)" },
+                { "key": "limit", "value": "20", "description": "Results per page (default: 20, max: 100)" }
+              ]
+            },
+            "description": "Returns a paginated list of credit transactions for a given user.\n\n**Path param:** `user_id` (UUID)\n\n**Query params:**\n- `start` (int, default 0)\n- `limit` (int, default 20, max 100)\n\n**Transaction types** are determined by the backend event system (e.g., `credit_awarded`).\n\n**Requires:** Bearer token."
+          },
+          "response": [
+            {
+              "name": "200 OK – Transaction list",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"count\": 5,\n  \"results\": [\n    {\n      \"id\": \"990e8400-e29b-41d4-a716-446655440004\",\n      \"event_id\": \"aa0e8400-e29b-41d4-a716-446655440005\",\n      \"amount\": 25,\n      \"type\": \"credit_awarded\",\n      \"created_at\": \"2026-04-21T10:05:00Z\"\n    }\n  ]\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/balance/health",
+              "host": ["{{base_url}}"],
+              "path": ["balance", "health"]
+            },
+            "description": "Balance service liveness/readiness probe. Routes through the admin router (no auth required)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🏆 Leaderboard Service",
+      "description": "Real-time and REST leaderboard endpoints.\n\nREST endpoint requires authentication. WebSocket endpoint (/ws) is public (no auth).",
+      "item": [
+        {
+          "name": "Get Leaderboard",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/leaderboard",
+              "host": ["{{base_url}}"],
+              "path": ["leaderboard"]
+            },
+            "description": "Returns today's top-N ranked users and the caller's own rank.\n\nThe caller is identified via Traefik-injected `X-User-Id` header.\n\n**Response:**\n- `top` — ranked list of `{ place, user_id, score }` entries\n- `user_place` — caller's rank (null if not on leaderboard)\n- `user_score` — caller's current score (0 if none)\n\n**Requires:** Bearer token."
+          },
+          "response": [
+            {
+              "name": "200 OK – Leaderboard",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"top\": [\n    { \"place\": 1, \"user_id\": \"aa0e8400-e29b-41d4-a716-446655440000\", \"score\": 500 },\n    { \"place\": 2, \"user_id\": \"bb0e8400-e29b-41d4-a716-446655440001\", \"score\": 420 },\n    { \"place\": 3, \"user_id\": \"770e8400-e29b-41d4-a716-446655440002\", \"score\": 300 }\n  ],\n  \"user_place\": 3,\n  \"user_score\": 300\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "WebSocket – Live Leaderboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Upgrade", "value": "websocket" },
+              { "key": "Connection", "value": "Upgrade" }
+            ],
+            "url": {
+              "raw": "ws://localhost:8000/ws",
+              "protocol": "ws",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["ws"]
+            },
+            "description": "WebSocket connection for real-time leaderboard updates.\n\nConnect using a WebSocket client (e.g., Postman's WebSocket tab or `wscat`).\n\n**URL:** `ws://localhost:8000/ws`\n\nThe server pushes live leaderboard snapshots over this connection. No auth is required at the WebSocket level (public Traefik router).\n\n**wscat example:**\n```\nwscat -c ws://localhost:8000/ws\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/leaderboard/health",
+              "host": ["{{base_url}}"],
+              "path": ["leaderboard", "health"]
+            },
+            "description": "Leaderboard service liveness/readiness probe. Routes through the admin router (no auth required)."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
